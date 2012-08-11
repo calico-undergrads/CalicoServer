@@ -1,14 +1,11 @@
 package calico.plugins.iip.graph.layout;
 
-import java.awt.Point;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class CIntentionSlice
 {
