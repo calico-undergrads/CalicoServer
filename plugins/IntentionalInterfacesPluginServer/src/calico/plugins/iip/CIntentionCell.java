@@ -8,6 +8,12 @@ import calico.components.CCanvas;
 import calico.networking.netstuff.CalicoPacket;
 import calico.plugins.iip.graph.layout.CIntentionLayout;
 
+/**
+ * Represents one canvas thumbnail in the Intention View. Internally it maintains a pixel position, a title, and the id
+ * of its <code>CIntentionType</code> (if any).
+ * 
+ * @author Byron Hawkins
+ */
 public class CIntentionCell
 {
 	public static final String DEFAULT_TITLE = "<default>";
@@ -42,7 +48,8 @@ public class CIntentionCell
 	}
 
 	/**
-	 * If different than the current location, set the location of the CIC and return true.
+	 * If different than the current location, set the location of the CIC and return true; otherwise return false to
+	 * indicate that the position did not change.
 	 */
 	public boolean setLocation(int x, int y)
 	{
@@ -62,6 +69,10 @@ public class CIntentionCell
 		return title;
 	}
 
+	/**
+	 * Return true if the user has assigned a title to this CIC; otherwise return false, indicating that this CIC has
+	 * the default title.
+	 */
 	public boolean hasUserTitle()
 	{
 		return !title.equals(DEFAULT_TITLE);
@@ -71,12 +82,15 @@ public class CIntentionCell
 	{
 		this.title = title;
 	}
-	
+
+	/**
+	 * Return true if any tag is assigned to this CIC, or false if the tag is null.
+	 */
 	public boolean hasIntentionType()
 	{
 		return (intentionTypeId != null);
 	}
-	
+
 	public Long getIntentionTypeId()
 	{
 		return intentionTypeId;
@@ -87,6 +101,9 @@ public class CIntentionCell
 		this.intentionTypeId = intentionTypeId;
 	}
 
+	/**
+	 * Set the tag back to <code>null</code>.
+	 */
 	public void clearIntentionType()
 	{
 		intentionTypeId = null;

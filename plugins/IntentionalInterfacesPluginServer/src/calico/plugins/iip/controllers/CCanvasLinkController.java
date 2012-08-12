@@ -13,6 +13,12 @@ import calico.plugins.iip.IntentionalInterfaceState;
 import calico.plugins.iip.IntentionalInterfacesServerPlugin;
 import calico.plugins.iip.graph.layout.CIntentionLayout;
 
+/**
+ * Coordinates instances of <code>CCanvasLink</code> and <code>CCanvasLinkAnchor</code> with commands received from
+ * clients.
+ * 
+ * @author Byron Hawkins
+ */
 public class CCanvasLinkController
 {
 	public static CCanvasLinkController getInstance()
@@ -22,8 +28,17 @@ public class CCanvasLinkController
 
 	private static final CCanvasLinkController INSTANCE = new CCanvasLinkController();
 
+	/**
+	 * All links in the IntentionView.
+	 */
 	private static Long2ReferenceArrayMap<CCanvasLink> links = new Long2ReferenceArrayMap<CCanvasLink>();
+	/**
+	 * All link anchors in the IntentionView.
+	 */
 	private static Long2ReferenceArrayMap<CCanvasLinkAnchor> linkAnchors = new Long2ReferenceArrayMap<CCanvasLinkAnchor>();
+	/**
+	 * All link anchors in the IntentionView, grouped by the canvas they are attached to, and indexed by the canvas id.
+	 */
 	private static Long2ReferenceArrayMap<Set<Long>> anchorIdsByCanvasId = new Long2ReferenceArrayMap<Set<Long>>();
 
 	public void populateState(IntentionalInterfaceState state)
@@ -51,6 +66,9 @@ public class CCanvasLinkController
 		return links.get(linkId);
 	}
 
+	/**
+	 * Get the id of the unique link coming into <code>canvasId</code>, or <code>null</code> if there is none.
+	 */
 	public Long getIncomingLink(long canvasId)
 	{
 		Set<Long> anchorIds = anchorIdsByCanvasId.get(canvasId);
@@ -69,6 +87,9 @@ public class CCanvasLinkController
 		return null;
 	}
 
+	/**
+	 * Get the anchor on the other side of the link from <code>anchorId</code>.
+	 */
 	public CCanvasLinkAnchor getOpposite(long anchorId)
 	{
 		CCanvasLinkAnchor anchor = linkAnchors.get(anchorId);
@@ -83,6 +104,9 @@ public class CCanvasLinkController
 		}
 	}
 
+	/**
+	 * Return true if <code>anchorId</code> represents an arrowhead.
+	 */
 	public boolean isDestination(long anchorId)
 	{
 		CCanvasLinkAnchor anchor = linkAnchors.get(anchorId);
@@ -90,6 +114,9 @@ public class CCanvasLinkController
 		return (link.getAnchorB() == anchor);
 	}
 
+	/**
+	 * Return true if <code>anchorId</code> represents an arrowhead which is presently attached to a canvas.
+	 */
 	public boolean isConnectedDestination(long anchorId)
 	{
 		if (!isDestination(anchorId))
@@ -133,6 +160,9 @@ public class CCanvasLinkController
 		getAnchorIdsForCanvasId(anchor.getCanvasId()).remove(anchor.getId());
 	}
 
+	/**
+	 * Get the ids of all the anchors attached to <code>canvasId</code>.
+	 */
 	public Set<Long> getAnchorIdsForCanvasId(long canvasId)
 	{
 		Set<Long> anchorIds = anchorIdsByCanvasId.get(canvasId);
@@ -144,6 +174,10 @@ public class CCanvasLinkController
 		return anchorIds;
 	}
 
+	/**
+	 * Change the pixel position of a link anchor. This method is also designated for changing the canvas to which the
+	 * anchor is attached, though this behavior is presently not supported.
+	 */
 	public void moveLinkAnchor(long anchor_uuid, long canvas_uuid, CCanvasLinkAnchor.Type type, int x, int y)
 	{
 		CCanvasLinkAnchor anchor = linkAnchors.get(anchor_uuid);
@@ -151,19 +185,13 @@ public class CCanvasLinkController
 		if (changedCanvas)
 		{
 			throw new UnsupportedOperationException("Moving arrows from one canvas to another is not presently supported.");
-			// getAnchorIdsForCanvasId(anchor.getCanvasId()).remove(anchor.getId());
 		}
 		anchor.move(canvas_uuid, type, x, y);
-		/**
-		 * <pre>
-		if (changedCanvas)
-		{
-			getAnchorIdsForCanvasId(anchor.getCanvasId()).add(anchor.getId());
-			IntentionalInterfacesServerPlugin.layoutGraph();
-		}
-		 */
 	}
 
+	/**
+	 * Get the ids of all the links attached to <code>canvasId</code>.
+	 */
 	public List<Long> getLinkIdsForCanvas(long canvasId)
 	{
 		List<Long> linkIds = new ArrayList<Long>();
