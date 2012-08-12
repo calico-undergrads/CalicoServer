@@ -152,7 +152,10 @@ class CIntentionCluster
 			slicesByRootCanvasId.put(slice.getRootCanvasId(), slice);
 		}
 
-		weighSlices(totalInOrbit);
+		if (totalInOrbit > 0)
+		{
+			weighSlices();
+		}
 		populated = true;
 	}
 
@@ -277,18 +280,8 @@ class CIntentionCluster
 	/**
 	 * Assign a relative weight to each slice in this cluster, based on its quantity of canvases.
 	 */
-	private void weighSlices(int totalInOrbit)
+	private void weighSlices()
 	{
-		if (totalInOrbit == 0)
-		{
-			return;
-		}
-
-		for (CIntentionSlice slice : slicesByRootCanvasId.values())
-		{
-			slice.setPopulationWeight(totalInOrbit);
-		}
-
 		double minimumRingRadius = 0.0;
 		double equalSliceWeight = 1.0 / (double) slicesByRootCanvasId.size();
 		for (CIntentionRing ring : rings)

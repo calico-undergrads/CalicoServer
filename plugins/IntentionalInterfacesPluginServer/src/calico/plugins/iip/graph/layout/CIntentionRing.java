@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Simple container for a cluster ring and its occupying canvases.
+ * This simple container object describes one ring in a cluster, along with the set of canvases that occupy the ring.
  * 
  * @author Byron Hawkins
  */
