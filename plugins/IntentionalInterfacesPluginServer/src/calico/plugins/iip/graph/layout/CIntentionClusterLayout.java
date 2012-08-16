@@ -5,8 +5,21 @@ import java.awt.Point;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Container for the layout of one cluster. The layout of canvases within the cluster is not handled here, that work is
+ * done instead in CIntentionCluster. Simple adjustments are made here, such as centering the layout within a bounding
+ * box, or moving the entire cluster according to instruction received from the CIntentionClusterGraph.
+ * 
+ * @author Byron Hawkins
+ */
 public class CIntentionClusterLayout
 {
+	/**
+	 * Public container for the position of each canvas in this cluster. Positions are global to the IntentionView, not
+	 * relative to the cluster.
+	 * 
+	 * @author Byron Hawkins
+	 */
 	public class CanvasPosition
 	{
 		public final long canvasId;
@@ -25,10 +38,17 @@ public class CIntentionClusterLayout
 		}
 	}
 
+	/**
+	 * The cluster for which layout is being organized.
+	 */
 	private final CIntentionCluster cluster;
+	/**
+	 * Set of canvas positions.
+	 */
 	private final List<CanvasPosition> canvasPositions = new ArrayList<CanvasPosition>();
 
-	// transitory value, per getBoundingBox()
+	// transitory values, which are refreshed during each call to <code>getBoundingBox()</code>, and cleared on
+	// <code>reset()</code>
 	private boolean isCalculated = false;
 	private final Point rootCanvasPosition = new Point();
 	private final Dimension boundingBox = new Dimension();
@@ -38,6 +58,9 @@ public class CIntentionClusterLayout
 		this.cluster = cluster;
 	}
 
+	/**
+	 * Reset transitory data related to the position of the whole cluster.
+	 */
 	void reset()
 	{
 		isCalculated = false;
@@ -60,6 +83,9 @@ public class CIntentionClusterLayout
 		canvasPositions.add(new CanvasPosition(canvasId, location));
 	}
 
+	/**
+	 * Calculate the center of this cluster such that the cluster appears exactly in the center of <code>bounds</code>
+	 */
 	Point getLayoutCenterWithinBounds(Dimension bounds)
 	{
 		if (!isCalculated)
@@ -71,6 +97,9 @@ public class CIntentionClusterLayout
 				+ (CIntentionLayout.INTENTION_CELL_SIZE.height / 2));
 	}
 
+	/**
+	 * Get the size of the box that tightly fits all canvases in this cluster.
+	 */
 	public Dimension getBoundingBox()
 	{
 		if (!isCalculated)

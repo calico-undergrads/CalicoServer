@@ -2,11 +2,25 @@ package calico.plugins.iip;
 
 import java.awt.Point;
 
+/**
+ * Represents one endpoint of an intention link between canvases. Includes the pixel coordinates of the endpoint. The
+ * implementation supports links which are unattached on either or both ends, though this behavior is not presently
+ * allowed. The implementation also supports attaching a link to a CGroup for "design inside" purposes, though this
+ * behavior is presently not used.
+ * 
+ * @author Byron Hawkins
+ */
 public class CCanvasLinkAnchor
 {
 	public enum Type
 	{
+		/**
+		 * Used for an anchor which is not attached to any canvas.
+		 */
 		FLOATING,
+		/**
+		 * Used for an anchor which is attached to a canvas.
+		 */
 		INTENTION_CELL;
 	}
 
@@ -49,7 +63,7 @@ public class CCanvasLinkAnchor
 	{
 		return uuid;
 	}
-	
+
 	public long getLinkId()
 	{
 		return link_uuid;
@@ -74,7 +88,7 @@ public class CCanvasLinkAnchor
 	{
 		return point;
 	}
-	
+
 	public void move(long canvas_uuid, Type type, int x, int y)
 	{
 		this.canvas_uuid = canvas_uuid;

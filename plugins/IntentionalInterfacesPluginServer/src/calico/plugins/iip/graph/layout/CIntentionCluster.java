@@ -15,28 +15,55 @@ import calico.plugins.iip.CCanvasLink;
 import calico.plugins.iip.CCanvasLinkAnchor;
 import calico.plugins.iip.controllers.CCanvasLinkController;
 
+/**
+ * Maintains the layout for one cluster. The <code>reset()</code> method must be called before each layout iteration.
+ * Otherwise this class can be regarded as stateless, since it will lazily refresh all of its other state after
+ * <code>reset()</code>.
+ * 
+ * @author Byron Hawkins
+ */
 class CIntentionCluster
 {
-	static double getUnitSpan()
-	{
-		return new CIntentionCluster(-1L).getOccupiedSpan();
-	}
-	
-	//git commit test
-
 	private static final SliceSorter SLICE_SORTER = new SliceSorter();
+
+	/**
+	 * Specifies the distance between rings.
+	 */
 	static final int RING_SEPARATION = 20 + CIntentionLayout.INTENTION_CELL_DIAMETER;
+	/**
+	 * Specifies the size of a "unit" cluster.
+	 */
 	static final Dimension CLUSTER_UNIT_SIZE = new Dimension(CIntentionLayout.INTENTION_CELL_SIZE.width + 20, CIntentionLayout.INTENTION_CELL_SIZE.height + 20);
 
+	/**
+	 * The rings of the cluster.
+	 */
 	private final List<CIntentionRing> rings = new ArrayList<CIntentionRing>();
+	/**
+	 * The radii of the rings, in screen pixels. This collection is populated on demand by <code>getRingRadii()</code>.
+	 * There are direct references to the collection, which assume it has been populated earlier in the layout workflow.
+	 * Changes to the layout workflow will of course require reconsidering that usage.
+	 */
 	private final List<Double> ringRadii = new ArrayList<Double>();
+	/**
+	 * The slices of the cluster, indexed by the canvas id of the slice's root canvas.
+	 */
 	private final Map<Long, CIntentionSlice> slicesByRootCanvasId = new LinkedHashMap<Long, CIntentionSlice>();
+	/**
+	 * The id of the root canvas of the cluster.
+	 */
 	private final long rootCanvasId;
 
-	// transitory values per layout execution
+	// these values are calculated or assigned during the layout process for this cluster, and are referenced by the
+	// CIntentionClusterGraph after this cluster has been layed out.
 	private final Point location = new Point();
 	private final Dimension layoutSize = new Dimension();
 
+	/**
+	 * This flag is reset before each execution of the layout process on this cluster. Having the flag allows for some
+	 * flex in the exact workflow of this cluster layout, which is helpful because some initialization has prerequisites
+	 * which are provided from outside this class in a sequence that often changes.
+	 */
 	private boolean populated = false;
 
 	public CIntentionCluster(long rootCanvasId)
@@ -55,34 +82,20 @@ class CIntentionCluster
 		return rootCanvasId;
 	}
 
-	double getOccupiedSpan()
-	{
-		if (!populated)
-			populateCluster();
-
-		double clusterRadius;
-		getRingRadii();
-		if (ringRadii.isEmpty())
-		{
-			clusterRadius = CIntentionLayout.INTENTION_CELL_DIAMETER;
-		}
-		else
-		{
-			clusterRadius = ringRadii.get(ringRadii.size() - 1) + (CIntentionLayout.INTENTION_CELL_DIAMETER / 2.0);
-		}
-		return 2 * clusterRadius;
-	}
-
 	Point getLocation()
 	{
 		return location;
 	}
 
+	/**
+	 * This must be called before any layout operations are invoked on this instance
+	 */
 	void reset()
 	{
 		populated = false;
 	}
 
+	// debug helper
 	void describeMaxProjectedSpans(StringBuilder buffer)
 	{
 		buffer.append("[");
@@ -105,6 +118,9 @@ class CIntentionCluster
 		buffer.append("]");
 	}
 
+	/**
+	 * Sort the canvases of this cluster into slices.
+	 */
 	void populateCluster()
 	{
 		if (populated)
@@ -136,10 +152,16 @@ class CIntentionCluster
 			slicesByRootCanvasId.put(slice.getRootCanvasId(), slice);
 		}
 
-		weighSlices(totalInOrbit);
+		if (totalInOrbit > 0)
+		{
+			weighSlices();
+		}
 		populated = true;
 	}
 
+	/**
+	 * Lazy-calculate and return the radii of this cluster's rings.
+	 */
 	List<Double> getRingRadii()
 	{
 		if (ringRadii.size() < rings.size())
@@ -171,21 +193,31 @@ class CIntentionCluster
 		return ringRadii;
 	}
 
+	/**
+	 * Get the total size occupied by this cluster, according to its most recent layout configuration.
+	 */
 	Dimension getLayoutSize()
 	{
 		return layoutSize;
 	}
 
+	/**
+	 * Assign a location for this cluster in the IntentionView.
+	 */
 	void setLocation(Point newLocation)
 	{
 		location.setLocation(newLocation);
 	}
 
+	/**
+	 * Layout the canvases of this cluster in concentric circles (other configurations were previously supported, but
+	 * currently this is the only one.
+	 */
 	CIntentionClusterLayout layoutClusterAsCircles(Point clusterCenter)
 	{
 		if (!populated)
 			populateCluster();
-		
+
 		CIntentionClusterLayout layout = new CIntentionClusterLayout(this);
 
 		layout.addCanvas(rootCanvasId, CIntentionLayout.centerCanvasAt(clusterCenter.x, clusterCenter.y));
@@ -245,18 +277,11 @@ class CIntentionCluster
 		}
 	}
 
-	private void weighSlices(int totalInOrbit)
+	/**
+	 * Assign a relative weight to each slice in this cluster, based on its quantity of canvases.
+	 */
+	private void weighSlices()
 	{
-		if (totalInOrbit == 0)
-		{
-			return;
-		}
-
-		for (CIntentionSlice slice : slicesByRootCanvasId.values())
-		{
-			slice.setPopulationWeight(totalInOrbit);
-		}
-
 		double minimumRingRadius = 0.0;
 		double equalSliceWeight = 1.0 / (double) slicesByRootCanvasId.size();
 		for (CIntentionRing ring : rings)
@@ -303,23 +328,19 @@ class CIntentionCluster
 			sumOfMaxWeights += slice.getMaxArcWeight();
 		}
 
+		// the slices may collectively prefer to have more than 360 degrees of space on the rings, for example if one
+		// slice has a big crowd on ring 2, and another slice has a big crowd on ring 3. In that case the
+		// weight of each slice must be reduced such that the sum does not exceed 360 degrees (represented here as 1.0).
 		double reductionRatio = 1.0 / Math.max(1.0, sumOfMaxWeights);
 		for (CIntentionSlice slice : slicesByRootCanvasId.values())
 		{
 			slice.setWeight(slice.getMaxArcWeight() * reductionRatio);
 		}
-
-		// what percentage of the minimum ring span is occupied by slice a? If it is less than the weighted percentage,
-		// then it only needs that much.
-
-		// Distributions:
-		// 1. weighted
-		// 2. equal
-		// 3. by occupancy at minimum ring size
-
-		// the idea is to choose a distribution per ring, normalize each one, and then balance maximi per slice
 	}
 
+	/**
+	 * Get a lazily constructed ring in this cluster.
+	 */
 	private CIntentionRing getRing(int ringIndex)
 	{
 		for (int i = rings.size(); i <= ringIndex; i++)
@@ -329,6 +350,12 @@ class CIntentionCluster
 		return rings.get(ringIndex);
 	}
 
+	/**
+	 * Arbitrarily sorts arcs by the canvas id of each arc's root canvas. This prevents arcs from trading places when
+	 * the layout is invoked multiple times in similar configurations.
+	 * 
+	 * @author Byron Hawkins
+	 */
 	private static class SliceSorter implements Comparator<CIntentionSlice>
 	{
 		public int compare(CIntentionSlice first, CIntentionSlice second)

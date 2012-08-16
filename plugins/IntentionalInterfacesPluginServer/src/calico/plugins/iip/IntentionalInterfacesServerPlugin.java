@@ -18,6 +18,11 @@ import calico.plugins.iip.graph.layout.CIntentionClusterLayout;
 import calico.plugins.iip.graph.layout.CIntentionLayout;
 import calico.uuid.UUIDAllocator;
 
+/**
+ * Outermost plugin container.
+ * 
+ * @author Byron Hawkins
+ */
 public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin implements CalicoEventListener, CalicoStateElement
 {
 	private final IntentionalInterfaceState state = new IntentionalInterfaceState();
@@ -29,10 +34,12 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 
 	public void onPluginStart()
 	{
+		// listen for these events from the main Calico server
 		CalicoEventHandler.getInstance().addListener(NetworkCommand.CANVAS_CREATE, this, CalicoEventHandler.PASSIVE_LISTENER);
 		CalicoEventHandler.getInstance().addListener(NetworkCommand.CANVAS_DELETE, this, CalicoEventHandler.PASSIVE_LISTENER);
 		CalicoEventHandler.getInstance().addListener(NetworkCommand.RESTORE_START, this, CalicoEventHandler.PASSIVE_LISTENER);
 
+		// listen for all the events created by this plugin
 		for (Integer event : this.getNetworkCommands())
 		{
 			System.out.println("IntentionalInterfacesPlugin: attempting to listen for " + event.intValue());
@@ -47,8 +54,11 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		CIntentionCellController.getInstance().createIntentionType(UUIDAllocator.getUUID(), "Continuation", 4);
 		CIntentionCellController.getInstance().createIntentionType(UUIDAllocator.getUUID(), "No Tag", 5);
 
+		// plug in to the persistence mechanism
 		CalicoPluginManager.registerCalicoStateExtension(this);
 
+		// create a <code>CIntentionCell</code> for each canvas currently existing in the main Calico server (there may
+		// be none).
 		for (long canvasId : CCanvasController.canvases.keySet())
 		{
 			createIntentionCell(canvasId);
@@ -65,6 +75,7 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 			return;
 		}
 
+		// events from this plugin are handled here
 		if (IntentionalInterfacesNetworkCommands.Command.isInDomain(event))
 		{
 			switch (IntentionalInterfacesNetworkCommands.Command.forId(event))
@@ -117,6 +128,7 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 			}
 		}
 		else
+		// events from the main Calico server go here
 		{
 			p.rewind();
 			p.getInt();
@@ -160,10 +172,6 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 	}
 
 	// this is called only during restore
-	/**
-	 * @param p
-	 * @param c
-	 */
 	private static void CIC_CREATE(CalicoPacket p, Client c)
 	{
 		p.rewind();
@@ -180,7 +188,7 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		cell.setTitle(title);
 
 		CIntentionCellController.getInstance().addCell(cell);
-		// clusters will be restored with the serialized graph
+		// clusters will be restored in CIntentionClusterGraph.inflateStoredData()
 	}
 
 	private static void CANVAS_DELETE(CalicoPacket p, Client c, long canvasId)
@@ -309,18 +317,6 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 	private static void CIC_DELETE(CalicoPacket p, Client c)
 	{
 		throw new UnsupportedOperationException("It is no longer allowed to delete a CIC separately from its CCanvas.");
-		/**
-		 * <pre>
-		p.rewind();
-		IntentionalInterfacesNetworkCommands.Command.CIC_DELETE.verify(p);
-
-		long uuid = p.getLong();
-		CIntentionCellController.getInstance().removeCellById(uuid);
-
-		layoutGraph();
-
-		forward(p, c);
-		 */
 	}
 
 	private static void CIC_CLUSTER_GRAPH(CalicoPacket p, Client c)
@@ -331,6 +327,10 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		CIntentionLayout.getInstance().inflateStoredClusterGraph(p.getString());
 	}
 
+	/**
+	 * Create a new CIntentionType, possibly with a color index already assigned. If no color index is assigned, the
+	 * server will choose a color randomly.
+	 */
 	private static void CIT_CREATE(CalicoPacket p, Client c)
 	{
 		p.rewind();
@@ -410,7 +410,8 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 
 		Long incomingLinkId = CCanvasLinkController.getInstance().getIncomingLink(anchorB.getCanvasId());
 		if (incomingLinkId == null)
-		{ // the canvas is not linked, so it must be a cluster root, and now it won't be
+		{ // the canvas is not linked, so it must be a cluster root, which means that entire cluster will be attached to
+		  // the <code>anchorA</code> cluster. So remove the cluster instance from the layout.
 			CIntentionLayout.getInstance().removeClusterIfAny(anchorB.getCanvasId());
 		}
 		else
@@ -428,6 +429,10 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		forward(p, c);
 	}
 
+	/**
+	 * Move the position of a link's anchor point. This method is also designated for changing the canvases to which the
+	 * link is attached, though that behavior is not presently supported.
+	 */
 	private static void CLINK_MOVE_ANCHOR(CalicoPacket p, Client c)
 	{
 		p.rewind();
@@ -473,6 +478,10 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		}
 	}
 
+	/**
+	 * Invoke the cluster layout. For each canvas, assign its new location. If this step actually moves the canvas, send
+	 * a packet with the new coordinates to all clients. Otherwise continue as if the canvas did not move.
+	 */
 	private static void layoutGraph()
 	{
 		List<CIntentionClusterLayout> clusterLayouts = CIntentionLayout.getInstance().layoutGraph();
@@ -483,7 +492,7 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 			{
 				CIntentionCell cell = CIntentionCellController.getInstance().getCellByCanvasId(canvas.canvasId);
 				if (cell.setLocation(canvas.location.x, canvas.location.y))
-				{
+				{ // <code>setLocation()</code> returns true when the canvas moves
 					CalicoPacket p = new CalicoPacket();
 					p.putInt(IntentionalInterfacesNetworkCommands.CIC_MOVE);
 					p.putLong(cell.getId());
@@ -497,11 +506,17 @@ public class IntentionalInterfacesServerPlugin extends AbstractCalicoPlugin impl
 		forward(CIntentionLayout.getInstance().getTopology().createPacket());
 	}
 
+	/**
+	 * Forward <code>p</code> to all clients.
+	 */
 	private static void forward(CalicoPacket p)
 	{
 		forward(p, null);
 	}
 
+	/**
+	 * Forward <code>p</code> to all clients except <code>c</code> (null is tolerated for <code>c</code>).
+	 */
 	private static void forward(CalicoPacket p, Client c)
 	{
 		if (c == null)

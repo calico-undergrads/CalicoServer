@@ -11,10 +11,32 @@ import java.util.StringTokenizer;
 import calico.networking.netstuff.CalicoPacket;
 import calico.plugins.iip.IntentionalInterfacesNetworkCommands;
 
+/**
+ * Maintains the layout of the clusters on the IntentionView. Call <code>reset()</code> before each layout iteration.
+ * Otherwise this class can be regarded as stateless.
+ * 
+ * @author Byron Hawkins
+ */
 public class CIntentionClusterGraph
 {
+	/**
+	 * Maintains the position of one cluster.
+	 * 
+	 * Imagine that the IntentionView sits on "graph paper" having cells the size of
+	 * CIntentionCluster.CLUSTER_UNIT_SIZE. Each instance of Position specifies (x,y) coordinates in the "graph paper"
+	 * as <code>xUnit</code> and <code>yUnit</code>, and also specifies the number of graph paper cells occupied as
+	 * <code>xUnitSapn</code> and <code>yUnitSpan</code>.
+	 * 
+	 * Imagine also that the IntentionView consists of an imaginary grid of clusters, each having no size. Each instance
+	 * of Position specifies (x,y) coordinates on this grid as <code>rowIndex</code> and <code>columnIndex</code>.
+	 * 
+	 * @author Byron Hawkins
+	 */
 	private static class Position
 	{
+		/**
+		 * x position of this cluster on the imaginary "graph paper" of unit clusters
+		 */
 		int xUnit;
 		int yUnit;
 		int yUnitSpan;
@@ -23,9 +45,18 @@ public class CIntentionClusterGraph
 		int rowIndex;
 		int columnIndex;
 
+		/**
+		 * The cluster for which this <code>Position</code> maintains position settings.
+		 */
 		CIntentionCluster cluster;
+		/**
+		 * The instance of the layout for <code>this.cluster</code>.
+		 */
 		CIntentionClusterLayout clusterLayout;
 
+		/**
+		 * Create a new position for a cluster positioned at the specified grid coordinates.
+		 */
 		Position(int rowIndex, int columnIndex)
 		{
 			xUnit = yUnit = -1;
@@ -37,6 +68,9 @@ public class CIntentionClusterGraph
 			this.columnIndex = columnIndex;
 		}
 
+		/**
+		 * Inflate a position from persistent storage.
+		 */
 		Position(String data)
 		{
 			StringTokenizer tokens = new StringTokenizer(data, ",");
@@ -71,21 +105,37 @@ public class CIntentionClusterGraph
 			return (cluster == null);
 		}
 
+		/**
+		 * Return the pixel position of the rightmost edge of the rightmost "graph paper" cell occupied by this
+		 * <code>Position</code>'s cluster.
+		 */
 		int getRightExtent()
 		{
 			return xUnit + xUnitSpan;
 		}
 
+		/**
+		 * Return the pixel position of the Lower edge of the lowest "graph paper" cell occupied by this
+		 * <code>Position</code>'s cluster.
+		 */
 		int getDownExtent()
 		{
 			return yUnit + yUnitSpan;
 		}
 
+		/**
+		 * Layout this <code>Position</code>'s cluster as if it were floating in empty space (and not in any cluster
+		 * graph).
+		 */
 		void layoutInEmptySpace()
 		{
 			clusterLayout = cluster.layoutClusterAsCircles(new Point());
 		}
 
+		/**
+		 * Having laid out the cluster, now center it within the region of "graph paper" allocated to this
+		 * <code>Position</code>.
+		 */
 		void centerLayoutInUnitBounds()
 		{
 			Point rootPosition = clusterLayout.getLayoutCenterWithinBounds(new Dimension(xUnitSpan * CIntentionCluster.CLUSTER_UNIT_SIZE.width, yUnitSpan
@@ -101,6 +151,9 @@ public class CIntentionClusterGraph
 			cluster.setLocation(center);
 		}
 
+		/**
+		 * Serialize this <code>Position</code> for network transport and/or persistent storage.
+		 */
 		void serialize(StringBuilder buffer)
 		{
 			buffer.append("[");
@@ -130,6 +183,11 @@ public class CIntentionClusterGraph
 		}
 	}
 
+	/**
+	 * The invisible "graph paper" underlying the IntentionView.
+	 * 
+	 * @author Byron Hawkins
+	 */
 	private static class UnitGraph
 	{
 		private final List<Integer> boundary = new ArrayList<Integer>();
@@ -198,10 +256,19 @@ public class CIntentionClusterGraph
 		RIGHT;
 	}
 
+	/**
+	 * The graph of "sizeless" cluster positions.
+	 */
 	private final List<List<Position>> graph = new ArrayList<List<Position>>();
 	private int columnCount = 0;
+	/**
+	 * <code>Position</code>s indexed by the root canvas id of the corresponding cluster.
+	 */
 	private final Long2ObjectOpenHashMap<Position> positionsByRootCanvasId = new Long2ObjectOpenHashMap<Position>();
 
+	/**
+	 * Keep track of state which is lazily refreshed once per layout iteration.
+	 */
 	private boolean isCalculated = false;
 	private final UnitGraph unitGraph = new UnitGraph();
 
@@ -442,6 +509,9 @@ public class CIntentionClusterGraph
 		return buffer.toString();
 	}
 
+	/**
+	 * Useful for adjusting the layout graph after the root canvas of a cluster has been deleted.
+	 */
 	void replaceCluster(long originalRootCanvasId, CIntentionCluster newCluster)
 	{
 		calculate();

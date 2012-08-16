@@ -8,15 +8,38 @@ import java.util.List;
 import calico.networking.netstuff.CalicoPacket;
 import calico.plugins.iip.IntentionalInterfacesNetworkCommands;
 
+/**
+ * The cluster layout is visually organized according to simple geometric shapes like concentric circles. This topology
+ * describes those visual geometry elements, such as the radii of the concentric circles for each cluster.
+ * 
+ * @author Byron Hawkins
+ */
 public class CIntentionTopology
 {
+	/**
+	 * Describes the topology for one cluster.
+	 * 
+	 * @author Byron Hawkins
+	 */
 	public class Cluster
 	{
 		private final long rootCanvasId;
+		/**
+		 * Center of this cluster in the IntentionView.
+		 */
 		private final Point center = new Point();
+		/**
+		 * Radii of the concentric circles for this cluster.
+		 */
 		private final List<Integer> radii = new ArrayList<Integer>();
+		/**
+		 * A box that tightly contains all canvases in the cluster.
+		 */
 		private final Rectangle boundingBox = new Rectangle();
 
+		/**
+		 * Construct a new cluster topology by extracting information from the cluster's current layout.
+		 */
 		Cluster(CIntentionClusterLayout clusterLayout)
 		{
 			rootCanvasId = clusterLayout.getCluster().getRootCanvasId();
@@ -32,6 +55,9 @@ public class CIntentionTopology
 			boundingBox.setLocation(center.x - layoutCenter.x, center.y - layoutCenter.y);
 		}
 
+		/**
+		 * Write the topology for this cluster to <code>buffer</code> for network transport or persistence.
+		 */
 		void serialize(StringBuilder buffer)
 		{
 			buffer.append(rootCanvasId);
@@ -75,6 +101,9 @@ public class CIntentionTopology
 	{
 	}
 
+	/**
+	 * Create a <code>CalicoPacket</code> containing all topology information for all clusters.
+	 */
 	public CalicoPacket createPacket()
 	{
 		CalicoPacket p = new CalicoPacket();
